@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Ripper Data</title>
+    <style>
+    .doc {
+      margin-left: 24px;
+    }
+    .nodoc {
+      color: #999;
+    }
+
+    .toc {
+      display: flex;
+      flex-direction: column;
+      flex-wrap: wrap;
+      height: 520px;
+    }
+
+    .toc-event {
+    }
+    </style>
+  </head>
+  <body>
+    <div>
+      <h1 id="toc">Ripper Events</h1>
+      <div class="toc">
+        <% ripper_data.each do |event_name, data| %>
+          <a href="#<%= event_name %>" class="toc-event <%= data.any? ? "" : "nodoc" %>"><code><%= event_name.inspect %></code></a>
+        <% end %>
+      </div>
+    </div>
+    <div>
+      <% ripper_data.each do |event_name, data| %>
+        <div class="event" id="<%= event_name %>">
+          <p>
+            <a href="#<%= event_name %>">#</a>
+            <code>on_<%= event_name %><%= data.any? && data[:arguments].any? ? "(#{data[:arguments].join(", ")})": "" %></code>
+            (<code><%= event_name.inspect %></code>,
+            in <code><%= Ripper::SCANNER_EVENTS.include?(event_name) ? "Ripper::SCANNER_EVENTS" : "Ripper::PARSER_EVENTS" %></code>)
+          <% if data.any? %>
+          <div class="doc">
+              <p><%= data[:description] %></p>
+              <% data[:examples].each do |ex| %>
+              <p>
+                <%= render_preview(ex) %>
+                <br>
+                <img src="data:image/png;base64,<%= render_graphviz_png_data(ex) %>"/>
+              </p>
+              <% end %>
+            </div>
+            <p><a href="#toc">↑ top</a></p>
+          <% else %>
+            <div class="doc nodoc">
+              <i>undocumented</i>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </body>
+</html>
