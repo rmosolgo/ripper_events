@@ -35,7 +35,7 @@
         doc_count = doc.size
         doc_perc = (doc_count.to_f / ripper_data.size) * 100
       %>
-      <p>Coverage: <%= doc_count / ripper_data.size %> (<%= doc_perc.round %>%)
+      <p>Coverage: <%= doc_count %> / <%= ripper_data.size %> (<%= doc_perc.round %>%)
       <div class="toc" id="toc">
         <% ripper_data.each do |event_name, data| %>
           <a href="#<%= event_name %>" class="toc-event <%= data.any? ? "" : "nodoc" %>"><code><%= event_name.inspect %></code></a>
