@@ -24,8 +24,19 @@
   </head>
   <body>
     <div>
-      <h1 id="toc">Ripper Events</h1>
-      <div class="toc">
+      <h1>Ripper Events</h1>
+      <p>
+        This is a documented list of events from Ruby's <a href="http://ruby-doc.org/stdlib-2.5.0/libdoc/ripper/rdoc/Ripper.html">Ripper</a> parser.
+        They can be handled in subclasses of <code>Ripper</code>, using <code>`on_*`</code> methods
+        of varying arity. (View this page's <a href="https://github.com/rmosolgo/ripper_events">source code</a>.)
+      <p>
+      <%
+        doc, nodoc = ripper_data.partition { |ev, d| d.any? }
+        doc_count = doc.size
+        doc_perc = (doc_count.to_f / ripper_data.size) * 100
+      %>
+      <p>Coverage: <%= doc_count / ripper_data.size %> (<%= doc_perc.round %>%)
+      <div class="toc" id="toc">
         <% ripper_data.each do |event_name, data| %>
           <a href="#<%= event_name %>" class="toc-event <%= data.any? ? "" : "nodoc" %>"><code><%= event_name.inspect %></code></a>
         <% end %>

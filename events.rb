@@ -30,7 +30,11 @@ module Events
     :args_add_star => {},
     :args_new => {},
     :array => {},
-    :assign => {},
+    :assign => {
+      description: "Usage of the assignment operator, =, with a left-hand side (receiving the value) and a right-hand side (the value).",
+      examples: ["a = 1", "obj.x = other.y"],
+      arguments: [:lhs, :rhs],
+    },
     :assign_error => {},
     :assoc_new => {},
     :assoc_splat => {},
@@ -59,7 +63,11 @@ module Events
     :command => {},
     :command_call => {},
     :comment => {},
-    :const => {},
+    :const => {
+      description: "A literal reference to a constant (variable beginning with a capital letter).",
+      examples: ["A = 1", "A.b", "module A; include B; end"],
+      arguments: [:name, :position],
+    },
     :const_path_field => {},
     :const_path_ref => {},
     :const_ref => {},
@@ -68,9 +76,21 @@ module Events
     :defined => {},
     :defs => {},
     :do_block => {},
-    :dot2 => {},
-    :dot3 => {},
-    :dyna_symbol => {},
+    :dot2 => {
+      description: "Two dots, .., for inclusive ranges or flip-flop operator.",
+      examples: ["1..10", "if x..y; end"],
+      arguments: [:lhs, :rhs],
+    },
+    :dot3 => {
+      description: "Three dots, ... , use for exclusive ranges.",
+      examples: ["'a'...'k'"],
+      arguments: [:lhs, :rhs],
+    },
+    :dyna_symbol => {
+      description: "A symbol literal, created from a string.",
+      examples: [':"x"', ':"x#{y}"'],
+      arguments: [:contents]
+    },
     :else => {},
     :elsif => {},
     :embdoc => {},
@@ -219,6 +239,15 @@ module Events
     :yield0 => {},
     :zsuper => {},
   }
+  end
+
+  # Ensure that the documentation hash is up-to-date with Ripper::EVENTS in this ruby version
+  def validate_events(ev_hash)
+    all_events = Ripper::EVENTS.dup
+    ev_hash.each_key { |k| all_events.delete(k) || raise("Documented key not found in Ripper::EVENTS: #{k.inspect}") }
+    if all_events.any?
+      raise "Some Ripper::EVENTS not documented: #{all_events.map(&:inspect).join(", ")}"
+    end
   end
 
   # HTML preview of Ruby sexp_raw

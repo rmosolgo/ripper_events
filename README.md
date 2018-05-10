@@ -6,7 +6,9 @@ Visible on GitHub pages: https://rmosolgo.github.io/ripper_events/
 
 ## Development
 
-- Install deps with `bundle install`
+- Install deps with:
+  - `bundle install`
+  - `brew install graphviz` (or install Graphviz another way)
 - Update the docs in `events.rb`
 - Update the HTML template in `template.html.erb`
 - Rebuild the HTML with `rake`
