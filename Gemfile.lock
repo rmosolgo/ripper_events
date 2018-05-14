@@ -3,6 +3,7 @@ GEM
   specs:
     graphviz (1.0.0)
       process-pipeline
+    kramdown (1.16.2)
     process-group (1.1.0)
     process-pipeline (1.0.1)
       process-group
@@ -13,6 +14,7 @@ PLATFORMS
 
 DEPENDENCIES
   graphviz
+  kramdown
   rake
 
 BUNDLED WITH

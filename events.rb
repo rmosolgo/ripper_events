@@ -2,8 +2,121 @@ require "ripper"
 require "graphviz"
 require "open3"
 require "base64"
+require "pp"
+require "kramdown"
 
 module Events
+  class Event
+    attr_reader :name, :description, :examples, :arguments
+    def initialize(name:, description: nil, examples: [], lex_examples: [], arguments: [])
+      @name = name
+      @description = description && Kramdown::Document.new(description).to_html
+      @examples = examples.map { |ex| Example.new(code: ex, type: :parser) }
+      @examples += lex_examples.map { |ex| Example.new(code: ex, type: :lex) }
+
+      @arguments = arguments
+    end
+
+    def documented?
+      !!@description
+    end
+  end
+
+  class Example
+    attr_reader :rendered_code, :rendered_image
+    def initialize(code:, type:)
+      if type == :parser
+        @rendered_code = render_preview(code)
+        sexp = Ripper.sexp_raw(code)
+        @rendered_image = %|<img src="data:image/png;base64,#{render_graphviz_png_data(sexp)}"/>|
+      else
+        @rendered_code = render_lex_preview(code)
+        tokens = Ripper.lex(code)
+        @rendered_image = %|<img src="data:image/png;base64,#{render_graphviz_png_data(tokens)}"/>|
+      end
+    end
+
+    private
+    # HTML preview of Ruby sexp_raw
+    def render_preview(ruby_code)
+      linked_sexp = pretty_sexp(Ripper.sexp_raw(ruby_code))
+      "<pre>Ripper.sexp_raw(#{ruby_code.inspect})\n#{linked_sexp}</pre>"
+    end
+
+    # HTML preview of Ruby sexp_raw
+    def render_lex_preview(ruby_code)
+      linked_sexp = pretty_sexp(Ripper.lex(ruby_code))
+      "<pre>Ripper.lex(#{ruby_code.inspect})\n#{linked_sexp}</pre>"
+    end
+
+    def pretty_sexp(sexp)
+      linked_sexp = link_sexp(sexp)
+      io = PP.pp(linked_sexp, StringIO.new)
+      output = io.string
+        .split("\n")
+        .map { |l| "# #{l}" }
+        .join("\n")
+      output
+    end
+
+    class Link
+      def initialize(name:)
+        @name = name
+        @link = "<a href='##{name.to_s.sub("@", "").sub(/^on_/, "")}'>#{name.inspect}</a>"
+      end
+
+      def pretty_print(pp)
+        pp.text(@link)
+      end
+    end
+
+    def link_sexp(sexp)
+      case sexp
+      when Symbol
+        Link.new(name: sexp)
+      when Array
+        sexp.map { |e| link_sexp(e) }
+      else
+        sexp
+      end
+    end
+
+    # Returns Base64 image data
+    def render_graphviz_png_data(sexp)
+      graph = Graphviz::Graph.new
+      add_children(graph, sexp)
+      dot = graph.to_dot
+      data = nil
+      Open3.popen3("dot", "-Tpng") do |stdin, stdout, stderr, thd|
+        stdin.puts(dot)
+        stdin.close
+        # err = stderr.gets(nil)
+        # if err
+        #   warn(err)
+        # end
+        data = stdout.gets(nil)
+      end
+      Base64.encode64(data)
+    end
+
+    # Add the Ruby sexp to the Graphviz node
+    def add_children(node, sexp)
+      if sexp
+        if (!sexp.is_a?(Array)) || (sexp.is_a?(Array) && sexp.first.is_a?(Symbol))
+          name, *children = sexp
+          child_node = node.add_node(label: name.inspect)
+          if children.any?
+            children.each { |c| add_children(child_node, c) }
+          end
+        else
+          child_node = node.add_node(label: "[...]")
+          sexp.each { |c| add_children(child_node, c) }
+        end
+      else
+        node.add_node(label: "nil")
+      end
+    end
+  end
   # All Ripper events
   #
   # From Ruby 2.4.2.
@@ -62,7 +175,10 @@ module Events
     :comma => {},
     :command => {},
     :command_call => {},
-    :comment => {},
+    :comment => {
+      description: "A code comment, preceded with `#`.",
+      lex_examples: ["# hi"],
+    },
     :const => {
       description: "A literal reference to a constant (variable beginning with a capital letter).",
       examples: ["A = 1", "A.b", "module A; include B; end"],
@@ -77,21 +193,25 @@ module Events
     :defs => {},
     :do_block => {},
     :dot2 => {
-      description: "Two dots, .., for inclusive ranges or flip-flop operator.",
+      description: "Two dots, `..`, for inclusive ranges or flip-flop operator.",
       examples: ["1..10", "if x..y; end"],
       arguments: [:lhs, :rhs],
     },
     :dot3 => {
-      description: "Three dots, ... , use for exclusive ranges.",
+      description: "Three dots, `...`, use for exclusive ranges.",
       examples: ["'a'...'k'"],
       arguments: [:lhs, :rhs],
     },
     :dyna_symbol => {
       description: "A symbol literal, created from a string.",
       examples: [':"x"', ':"x#{y}"'],
-      arguments: [:contents]
+      arguments: [:contents],
     },
-    :else => {},
+    :else => {
+      description: "An `else` keyword, used with `if` or `begin`-`rescue`.",
+      examples: ["if a; b; else; c; end", "begin; a; rescue; b; else; c; end"],
+      arguments: [:statements],
+    },
     :elsif => {},
     :embdoc => {},
     :embdoc_beg => {},
@@ -101,7 +221,11 @@ module Events
     :embvar => {},
     :ensure => {},
     :excessed_comma => {},
-    :fcall => {},
+    :fcall => {
+      description: "A method call without a receiver, but syntactically known to be a method call, not a local variable reference. (This can be known by the presence of arguments.)",
+      examples: ["a(b)", "a { }"],
+      arguments: [:method_name, :args],
+    },
     :field => {},
     :float => {},
     :for => {},
@@ -110,12 +234,26 @@ module Events
     :heredoc_beg => {},
     :heredoc_dedent => {},
     :heredoc_end => {},
-    :ident => {},
+    :ident => {
+      description: "A local reference (not a constant) which may be a method call or local variable reference.",
+      examples: ["a", "b = 1", "C.d"],
+      lex_examples: ["a", "A.a"],
+      arguments: [:name, :position],
+    },
     :if => {},
-    :if_mod => {},
+    :if_mod => {
+      description: "Line-final if.",
+      examples: ["a if b"],
+      arguments: [:statement, :condition],
+    },
     :ifop => {},
     :ignored_nl => {},
-    :imaginary => {},
+    :imaginary => {
+      description: "The imaginary part of a complex number",
+      examples: ["2+1i"],
+      lex_examples: ["2i"],
+      arguments: [:string, :position],
+    },
     :int => {
       description: "An integer literal",
       examples: ["100"],
@@ -247,60 +385,6 @@ module Events
     ev_hash.each_key { |k| all_events.delete(k) || raise("Documented key not found in Ripper::EVENTS: #{k.inspect}") }
     if all_events.any?
       raise "Some Ripper::EVENTS not documented: #{all_events.map(&:inspect).join(", ")}"
-    end
-  end
-
-  # HTML preview of Ruby sexp_raw
-  def render_preview(ruby_code)
-    linked_sexp = link_sexp(Ripper.sexp_raw(ruby_code))
-    "<code>Ripper.sexp_raw(#{ruby_code.inspect}) # => #{linked_sexp}</code>"
-  end
-
-  def link_sexp(sexp)
-    case sexp
-    when Symbol
-      "<a href='##{sexp.to_s.sub("@", "")}'>#{sexp.inspect}</a>"
-    when Array
-      "[#{sexp.map { |e| link_sexp(e) }.join(", ")}]"
-    else
-      sexp.inspect
-    end
-  end
-
-  # Returns Base64 image data
-  def render_graphviz_png_data(ruby_code)
-    sexp = Ripper.sexp_raw(ruby_code)
-    graph = Graphviz::Graph.new
-    add_children(graph, sexp)
-    dot = graph.to_dot
-    data = nil
-    Open3.popen3("dot", "-Tpng") do |stdin, stdout, stderr, thd|
-      stdin.puts(dot)
-      stdin.close
-      # err = stderr.gets(nil)
-      # if err
-      #   warn(err)
-      # end
-      data = stdout.gets(nil)
-    end
-    Base64.encode64(data)
-  end
-
-  # Add the Ruby sexp to the Graphviz node
-  def add_children(node, sexp)
-    if sexp
-      if (!sexp.is_a?(Array)) || (sexp.is_a?(Array) && sexp.first.is_a?(Symbol))
-        name, *children = sexp
-        child_node = node.add_node(label: name.inspect)
-        if children.any?
-          children.each { |c| add_children(child_node, c) }
-        end
-      else
-        child_node = node.add_node(label: "[...]")
-        sexp.each { |c| add_children(child_node, c) }
-      end
-    else
-      node.add_node(label: "nil")
     end
   end
 end

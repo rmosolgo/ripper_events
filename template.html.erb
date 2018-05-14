@@ -44,21 +44,22 @@
     </div>
     <div>
       <% ripper_data.each do |event_name, data| %>
-        <div class="event" id="<%= event_name %>">
+        <% event = Events::Event.new(name: event_name, **data) %>
+        <div class="event" id="<%= event.name %>">
           <p>
-            <a href="#<%= event_name %>">#</a>
-            <code>on_<%= event_name %><%= data.any? && data[:arguments].any? ? "(#{data[:arguments].join(", ")})": "" %></code>
-            (<code><%= event_name.inspect %></code>,
-            in <code><%= Ripper::SCANNER_EVENTS.include?(event_name) ? "Ripper::SCANNER_EVENTS" : "Ripper::PARSER_EVENTS" %></code>)
-          <% if data.any? %>
-          <div class="doc">
-              <p><%= data[:description] %></p>
-              <% data[:examples].each do |ex| %>
-              <p>
-                <%= render_preview(ex) %>
-                <br>
-                <img src="data:image/png;base64,<%= render_graphviz_png_data(ex) %>"/>
-              </p>
+            <a href="#<%= event.name %>">#</a>
+            <code>on_<%= event.name %><%= event.arguments.any? ? "(#{event.arguments.join(", ")})": "" %></code>
+            (<code><%= event.name.inspect %></code>,
+            in <code><%= Ripper::SCANNER_EVENTS.include?(event.name) ? "Ripper::SCANNER_EVENTS" : "Ripper::PARSER_EVENTS" %></code>)
+          <% if event.documented? %>
+            <div class="doc">
+              <p><%= event.description %></p>
+              <% event.examples.each do |ex| %>
+                <p>
+                  <%= ex.rendered_code %>
+                  <br>
+                  <%= ex.rendered_image %>
+                </p>
               <% end %>
             </div>
             <p><a href="#toc">↑ top</a></p>
