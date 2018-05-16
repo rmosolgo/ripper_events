@@ -128,19 +128,64 @@ module Events
   # - arguments
   def get_all_ripper_data
   {
-    :BEGIN => {},
-    :CHAR => {},
-    :END => {},
-    :__end__ => {},
-    :alias => {},
+    :BEGIN => {
+      description: "Adds a global initialization hook, always with curly braces.",
+      examples: ["BEGIN { do_stuff }"],
+      arguments: [:block]
+    },
+    :CHAR => {
+      description: "A one-character string literal, with `?`.",
+      lex_examples: ["?a"],
+      arguments: [:string, :position]
+    },
+    :END => {
+      description: "Adds a global shutdown hook, always with curly braces",
+      examples: ["END { do_stuff }"],
+      arguments: [:block]
+    },
+    :__end__ => {
+      description: "Delimits the Ruby script from the following data (`DATA`). Interestingly, the following data is _absent_ from the parsed s-expression.",
+      examples: ["a\n__END__\nwacky stuff"],
+      lex_examples: ["a\n__END__\nwacky stuff"],
+      arguments: [:string, :position]
+    },
+    :alias => {
+      description: "`alias` keyword, whose arguments are always parsed as `:symbol_literal`s",
+      examples: ["alias :a :b", "alias a b"],
+      arguments: [:new_method, :old_method]
+    },
     :alias_error => {},
-    :aref => {},
-    :aref_field => {},
+    :aref => {
+      description: "Value lookup with square brackets. (Short for \"array reference\"?)",
+      examples: ["a[:b]", "c[0..2]"],
+      arguments: [:receiver, :arguments],
+    },
+    :aref_field => {
+      description: "Square bracket access, but when used in the context of assignment.",
+      examples: ["[0,1,2][1] = 2"],
+      arguments: [:receiver, :arguments]
+    },
     :arg_ambiguous => {},
-    :arg_paren => {},
-    :args_add => {},
-    :args_add_block => {},
-    :args_add_star => {},
+    :arg_paren => {
+      description: "Explicit parentheses for arguments",
+      examples: ["a(1)"],
+      arguments: [:arguments]
+    },
+    :args_add => {
+      description: "The beginning of a list of arguments.",
+      examples: ["a(1)", "a(1, b: 2)"],
+      arguments: ["??"],
+    },
+    :args_add_block => {
+      description: "An args list, may also contain an `&`-passed block.",
+      examples: ["a(&b)", "a(b)", "a(b, &c)"],
+      arguments: [:normal_args, :ampersand_block]
+    },
+    :args_add_star => {
+      description: "An arguments list with a splatted array of arguments.",
+      examples: ["a(*b)", "a(b, c, *d)"],
+      arguments: [:preceding_args, :spatted_arg]
+    },
     :args_new => {},
     :array => {},
     :assign => {
